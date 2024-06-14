@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estudo Tracker</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+  }
+  
+  #container {
+    text-align: center;
+  }
+
+  #timer {
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+
+  .button {
+    font-size: 26px;
+    margin-top: 20px;
+  }
+
+  #startButton {
+    margin-bottom: 20px; /* Adiciona margem para evitar que o botão seja coberto */
+  }
+
+  #totalStudyTime {
+    font-size: 20px;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="container">
+  <button id="startButton" class="button">Iniciar Estudos</button>
+  <button id="stopButton" class="button" style="display: none;">Parar Estudos</button>
+  <div id="timer">Tempo estudado: 00:00:00</div>
+  <div>
+    <label for="exercisesInput">Exercicios feitos:</label>
+    <input type="number" id="exercisesInput" value="0">
+    <br>
+    <label for="correctExercisesInput">Exercicios acertados:</label>
+    <input type="number" id="correctExercisesInput" value="0">
+  </div>
+  <ul id="sessionList"></ul>
+  <button id="downloadButton" class="button" style="display: none;">Baixar Dados</button>
+  <div id="totalStudyTime">Tempo total estudado: 00:00:00</div>
+  <div id="totalExercisesDone">Total de exercicios feitos: 0</div>
+  <div id="totalExercisesCorrect">Total de exercicios corretos: 0</div>
+  <div id="averageAccuracy">Precisao media: 0%</div>
+  <button id="resetButton" class="button" style="margin-top: 20px;">Zerar Dados</button>
+</div>
+
+<script>
+  let startTime;
+  let timerInterval;
+  let totalTime = 0;
+  let sessionsByDate = JSON.parse(localStorage.getItem('sessionsByDate')) || {};
+
+  const timerDisplay = document.getElementById('timer');
+  const startButton = document.getElementById('startButton');
+  const stopButton = document.getElementById('stopButton');
+  const sessionList = document.getElementById('sessionList');
+  const downloadButton = document.getElementById('downloadButton');
+  const totalStudyTimeDisplay = document.getElementById('totalStudyTime');
+  const totalExercisesDoneDisplay = document.getElementById('totalExercisesDone');
+  const totalExercisesCorrectDisplay = document.getElementById('totalExercisesCorrect');
+  const averageAccuracyDisplay = document.getElementById('averageAccuracy');
+  const resetButton = document.getElementById('resetButton');
+
+  function startStudySession() {
+    startTime = new Date().getTime();
+    timerInterval = setInterval(updateTimer, 1000);
+    startButton.style.display = 'none';
+    stopButton.style.display = 'inline-block';
+  }
+
+  function stopStudySession() {
+    clearInterval(timerInterval);
+    startButton.style.display = 'inline-block';
+    stopButton.style.display = 'none';
+
+    const sessionTime = formatTime(totalTime);
+    const exercisesInput = document.getElementById('exercisesInput');
+    const correctExercisesInput = document.getElementById('correctExercisesInput');
+    const exercisesDone = parseInt(exercisesInput.value);
+    const exercisesCorrect = parseInt(correctExercisesInput.value);
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1; // Os meses começam de 0
+    const day = currentDate.getDate();
+    const dateKey = `${year}-${month}-${day}`;
+
+    if (!sessionsByDate[dateKey]) {
+      sessionsByDate[dateKey] = []; // Inicializa o array para o dia se ainda não existir
+    }
+
+    const accuracy = (exercisesCorrect / exercisesDone * 100).toFixed(2); // Calcula a porcentagem de acertos
+
+    // Cria um objeto com os dados da sessão
+    const sessionData = {
+      time: sessionTime,
+      exercisesDone: exercisesDone,
+      exercisesCorrect: exercisesCorrect,
+      accuracy: accuracy
+    };
+
+    // Adiciona a sessão ao array correspondente à data atual
+    sessionsByDate[dateKey].push(sessionData);
+
+    // Atualiza o armazenamento local
+    localStorage.setItem('sessionsByDate', JSON.stringify(sessionsByDate));
+
+    // Atualiza a lista de sessões exibida na página
+    updateSessionList();
+
+    totalTime = 0;
+    updateDisplay();
+
+    // Mostra o botão de download ao finalizar a sessão
+    downloadButton.style.display = 'inline-block';
+
+    // Atualiza o tempo total estudado e as estatisticas
+    updateTotalStudyTime();
+    updateStatisticsDisplay();
+  }
+
+  function updateSessionList() {
+    // Limpa a lista antes de recriá-la
+    sessionList.innerHTML = '';
+
+    // Itera sobre as datas no objeto sessionsByDate
+    for (const date in sessionsByDate) {
+      if (sessionsByDate.hasOwnProperty(date)) {
+        const sessions = sessionsByDate[date];
+        const dateHeader = document.createElement('h3');
+        dateHeader.textContent = date;
+        sessionList.appendChild(dateHeader);
+
+        // Itera sobre as sessões de estudo para essa data
+        sessions.forEach(session => {
+          const sessionItem = document.createElement('li');
+
+          sessionItem.textContent = `Tempo estudado: ${session.time}, Exercicios feitos: ${session.exercisesDone}, Exercicios acertados: ${session.exercisesCorrect}, Precisao: ${session.accuracy}%`;
+          sessionList.appendChild(sessionItem);
+        });
+      }
+    }
+  }
+
+  function updateTimer() {
+    const currentTime = new Date().getTime();
+    totalTime = currentTime - startTime;
+    timerDisplay.textContent = 'Tempo estudado: ' + formatTime(totalTime);
+  }
+
+  function formatTime(milliseconds) {
+    const hours = Math.floor(milliseconds / 3600000);
+    const minutes = Math.floor((milliseconds % 3600000) / 60000);
+    const seconds = Math.floor((milliseconds % 60000) / 1000);
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+  }
+
+  function pad(num) {
+    return num.toString().padStart(2, '0');
+  }
+
+  function updateDisplay() {
+    document.getElementById('exercisesInput').value = 0;
+    document.getElementById('correctExercisesInput').value = 0;
+  }
+
+  function updateTotalStudyTime() {
+    let totalMilliseconds = 0;
+
+    for (const date in sessionsByDate) {
+      if (sessionsByDate.hasOwnProperty(date)) {
+        const sessions = sessionsByDate[date];
+
+        sessions.forEach(session => {
+          const timeParts = session.time.split(':');
+          const hours = parseInt(timeParts[0]);
+          const minutes = parseInt(timeParts[1]);
+          const seconds = parseInt(timeParts[2]);
+          totalMilliseconds += (hours * 3600000) + (minutes * 60000) + (seconds * 1000);
+        });
+      }
+    }
+
+    const totalFormatted = formatTime(totalMilliseconds);
+    totalStudyTimeDisplay.textContent = `Tempo total estudado: ${totalFormatted}`;
+  }
+
+  function downloadData() {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    const day = currentDate.getDate();
+    const fileName = `estudo_tracker_${year}-${month}-${day}.txt`;
+
+    let data = '';
+
+    for (const date in sessionsByDate) {
+      if (sessionsByDate.hasOwnProperty(date)) {
+        const sessions = sessionsByDate[date];
+
+        data += `${date}:\n`;
+
+        sessions.forEach(session => {
+          data += `Tempo estudado: ${session.time}, Exercicios feitos: ${session.exercisesDone}, Exercicios acertados: ${session.exercisesCorrect}, Precisao: ${session.accuracy}%\n`;
+        });
+
+        data += '\n';
+      }
+    }
+
+    const blob = new Blob([data], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function calculateStatistics() {
+    let totalExercisesDone = 0;
+    let totalExercisesCorrect = 0;
+    let totalSessions = 0;
+    let totalAccuracy = 0;
+
+    for (const date in sessionsByDate) {
+      if (sessionsByDate.hasOwnProperty(date)) {
+        const sessions = sessionsByDate[date];
+
+        sessions.forEach(session => {
+          totalExercisesDone += session.exercisesDone;
+          totalExercisesCorrect += session.exercisesCorrect;
+          totalSessions++;
+        });
+      }
+    }
+
+    if (totalSessions > 0) {
+      totalAccuracy = ((totalExercisesCorrect / totalExercisesDone) * 100 / totalSessions).toFixed(2);
+    }
+
+    return {
+      totalExercisesDone: totalExercisesDone,
+      totalExercisesCorrect: totalExercisesCorrect,
+      averageAccuracy: totalAccuracy
+    };
+  }
+
+  function updateStatisticsDisplay() {
+    const statistics = calculateStatistics();
+
+    totalExercisesDoneDisplay.textContent = `Total de exercicios feitos: ${statistics.totalExercisesDone}`;
+    totalExercisesCorrectDisplay.textContent = `Total de exercicios corretos: ${statistics.totalExercisesCorrect}`;
+    averageAccuracyDisplay.textContent = `Precisao media: ${statistics.averageAccuracy}%`;
+  }
+
+  function resetData() {
+    // Reseta os dados
+    localStorage.removeItem('sessionsByDate');
+    sessionsByDate = {};
+    updateSessionList();
+    updateTotalStudyTime();
+    updateStatisticsDisplay();
+    downloadButton.style.display = 'none'; // Esconde o botao de download
+  }
+
+  startButton.addEventListener('click', startStudySession);
+  stopButton.addEventListener('click', stopStudySession);
+  downloadButton.addEventListener('click', downloadData);
+  resetButton.addEventListener('click', resetData);
+
+  // Mostra o botao de download se houver dados salvos
+  if (Object.keys(sessionsByDate).length > 0) {
+    downloadButton.style.display = 'inline-block';
+  }
+
+  // Atualiza o tempo total estudado ao carregar a página
+  updateTotalStudyTime();
+</script>
+</body>
+</html>
